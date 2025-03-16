@@ -1,0 +1,24 @@
+# Virtual Environment
+venv/
+env/
+
+# Python Bytecode Files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment Variables & Secrets
+.env
+*.sqlite3
+
+# Cache & Logs
+*.log
+*.db
+cache/
+logs/
+
+# Editor/IDE Files
+.vscode/
+.idea/
+*.swp
