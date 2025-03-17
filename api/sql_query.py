@@ -7,7 +7,7 @@ def check_user_exist(db:Session, email:str):
     return user
 
 def insert_new_user(db:Session, user:schema.UserCreate):
-    new_user = models.User(email=user.email, password=user.password)
+    new_user = models.User(username=user.username, email=user.email, password=user.password)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)

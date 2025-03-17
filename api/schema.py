@@ -4,6 +4,7 @@ from typing import Optional
 
 class UserBase(BaseModel):
     email: EmailStr = Field(..., title="user email address", example="example@gmail.com")
+    username: str = Field(..., title="Username", example="Dental")
     
     
 class UserCreate(UserBase): #user create requrest data type

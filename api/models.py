@@ -8,6 +8,7 @@ class User(Base):
     id = sql.Column(sql.Integer, autoincrement=True, primary_key=True, index=True)
     email = sql.Column(sql.String(255), unique=True, index=True)
     password = sql.Column(sql.String, nullable=False)
+    username = sql.Column(sql.String, nullable=False)
     is_active = sql.Column(sql.Boolean(), default=True)
     is_verified = sql.Column(sql.Boolean(), default=False)
     date_joined = sql.Column(sql.TIMESTAMP(timezone=True), server_default=text('now()'))

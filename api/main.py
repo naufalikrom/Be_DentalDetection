@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from .routers import auth
-
+import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 
 
 app=FastAPI(
@@ -16,8 +17,20 @@ app=FastAPI(
     }
 )
 
-@app.get("/testing")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Sesuaikan dengan URL frontend
+    allow_credentials=True,
+    allow_methods=["*"],  # Mengizinkan semua metode (GET, POST, OPTIONS, dll.)
+    allow_headers=["*"],  # Mengizinkan semua header
+)
+
+@app.get("/api/testing")
 async def testing():
     return {"test": "its working"}
+
+@app.get("/api")
+async def root():
+    return {"message": "Awesome Dental Detection"}
 
 app.include_router(auth.router)

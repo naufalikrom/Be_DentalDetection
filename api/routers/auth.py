@@ -103,6 +103,18 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     
     if not utils.verify_password(form_data.password, user.password):
         raise HTTPException(status_code=400, detail="Invalid email or password")
+    
+    # user_data = {
+    #     "sub": user.username,  # Subject utama
+    #     "id": user.id,
+    #     "email": user.email,
+    #     "username": user.username,
+    #     "is_verified": user.is_verified
+    # }
+    
+    # access_token = utils.create_access_token(
+    #     data=user_data, expires_delta=timedelta(minutes=utils.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # )
 
     access_token = utils.create_access_token(
         data={"sub": user.email}, expires_delta=timedelta(minutes=utils.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -160,7 +172,7 @@ async def reset_password(email: str, otp: str, new_password: str, db: Session = 
     return {"message": "Password successfully reset"}
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -170,21 +182,25 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
     try:
         payload = jwt.decode(token, utils.SECRET_KEY, algorithms=[utils.ALGORITHM])
-        email: str = payload.get("sub")
-
-        if email is None:
-            raise credentials_exception
         
-        user = sql_query.get_user_by_email(db, email)
+        # Ambil data lengkap dari token
+        user_data = {
+            "id": payload.get("id"),
+            "email": payload.get("email"),
+            "password": payload.get("password"),
+            "username": payload.get("username"),
+            "is_verified": payload.get("is_verified"),
+        }
 
-        if user is None:
+        if not user_data["email"]:
             raise credentials_exception
-        
-        return user
+
+        return user_data  # Langsung return data user dari token tanpa query ke database
 
     except JWTError:
         raise credentials_exception
+
     
 @router.get("/protected")
-async def protected_route(current_user: models.User = Depends(get_current_user)):
-    return {"message": f"Welcome, {current_user.email}"}
+async def protected_route(current_user: dict = Depends(get_current_user)):
+    return {"message": f"Welcome, {current_user['username']}", "user_data": current_user}
