@@ -2,6 +2,7 @@ import sqlalchemy as sql
 from .database import Base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import text
+from datetime import datetime, timedelta, timezone
 
 class User(Base):
     __tablename__ = "users"
@@ -20,3 +21,4 @@ class UserOneTimePassword(Base):
     user_id = sql.Column(sql.Integer, sql.ForeignKey('users.id', ondelete='CASCADE'))
     code = sql.Column(sql.String(6), unique=True, nullable=False)
     is_valid = sql.Column(sql.Boolean(), default=True)
+    created_at = sql.Column(sql.DateTime, default=datetime.now, nullable=False)

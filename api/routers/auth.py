@@ -7,7 +7,7 @@ from .. import schema, sql_query, utils, models
 
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 
 router = APIRouter(
@@ -15,6 +15,35 @@ router = APIRouter(
     tags=["Authentication"]
 )
 
+OTP_EXPIRATION_SECONDS = 180
+
+#LOGIN
+@router.post("/login")
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = sql_query.get_user_by_email(db, form_data.username)
+
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+    
+    if not utils.verify_password(form_data.password, user.password):
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+    
+    user_data = {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "password": user.password,
+        "is_verified": user.is_verified
+    }
+    
+    access_token = utils.create_access_token(
+        data=user_data, expires_delta=timedelta(minutes=utils.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+#Register
 @router.post('/signup', status_code=status.HTTP_201_CREATED)
 async def register_user(user: schema.UserCreate, background_task: BackgroundTasks ,db: Session = Depends(get_db)):
     
@@ -33,7 +62,7 @@ async def register_user(user: schema.UserCreate, background_task: BackgroundTask
     #user email
     #otp
     otpcode = utils.generate_otp_code()
-    otp_data = schema.OTPData(code=otpcode, user_id=user.id) 
+    otp_data = schema.OTPData(code=otpcode, user_id=user.id, created_at=datetime.now()) 
     utils.send_email("verify your email", [user.email], background_task, f"your otp code is {otpcode}")
 
     
@@ -42,31 +71,52 @@ async def register_user(user: schema.UserCreate, background_task: BackgroundTask
     return{
         "message" : "account successfully created, please verify your email with One Time Passwoord to your email address"
     }
-
-@router.post("/email-verivication", status_code=status.HTTP_200_OK)
-async def verify_email(otp:schema.OneTimePassword, response: Response, db: Session = Depends(get_db)): 
-    otp_user_qs=db.query(models.UserOneTimePassword).filter(models.UserOneTimePassword.code == otp.code)
-    otp_user=otp_user_qs.first()
     
+
+#OTP-Verification
+@router.post("/email-verification", status_code=status.HTTP_200_OK)
+async def verify_email(otp: schema.OneTimePassword, response: Response, db: Session = Depends(get_db)): 
+    otp_user_qs = db.query(models.UserOneTimePassword).filter(models.UserOneTimePassword.code == otp.code)
+    otp_user = otp_user_qs.first()
+
+    if not otp_user:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {"message": "Invalid OTP code"}
+    
+    # Hitung waktu sejak OTP dibuat
+    current_time = datetime.now()
+    otp_age = (current_time - otp_user.created_at).total_seconds()
+
+    # Jika OTP sudah lebih dari 180 detik, anggap expired
+    if otp_age > OTP_EXPIRATION_SECONDS:
+        otp_user_qs.update({"is_valid": False}, synchronize_session=False)
+        db.commit()
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {"message": "OTP has expired, please request a new one"}
+
+    # Jika OTP masih berlaku, cek validitasnya
     isValid = utils.verify_otp(otp.code)
     if isValid and otp_user.is_valid:
-        user_qs=db.query(models.User).filter(models.User.id == otp_user.user_id)
+        user_qs = db.query(models.User).filter(models.User.id == otp_user.user_id)
         user = user_qs.first()
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="invalid user")
-        user_qs.update({"is_verified":True}, synchronize_session=False)
-        otp_user_qs.update({"is_valid":False}, synchronize_session=False)
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid user")
+        
+        # Verifikasi user
+        user_qs.update({"is_verified": True}, synchronize_session=False)
+        otp_user_qs.update({"is_valid": False}, synchronize_session=False)
         db.commit()
-        return{
-            "message":"email successfully verified",
-            "is_verified":user.is_verified
+        
+        return {
+            "message": "Email successfully verified",
+            "is_verified": user.is_verified
         }
-    else:
-        otp_user_qs.update({"is_valid":False}, synchronize_session=False)
-        response.status_code=status.HTTP_400_BAD_REQUEST
-        return{
-            "message":"invalid otp code"
-        }
+    
+    # Jika OTP salah
+    otp_user_qs.update({"is_valid": False}, synchronize_session=False)
+    db.commit()
+    response.status_code = status.HTTP_400_BAD_REQUEST
+    return {"message": "Invalid OTP code"}
 
 
 @router.post('/resend_otp', status_code=status.HTTP_200_OK)
@@ -85,7 +135,7 @@ async def resend_otp(email: str, background_task: BackgroundTasks, db: Session =
 
     # Generate OTP baru
     new_otp = utils.generate_otp_code()
-    new_otp_data = schema.OTPData(code=new_otp, user_id=user.id)
+    new_otp_data = schema.OTPData(code=new_otp, user_id=user.id, created_at=datetime.now())
     sql_query.create_otp_for_user(db, otp=new_otp_data)
 
     # Kirim ulang OTP ke email
@@ -94,34 +144,7 @@ async def resend_otp(email: str, background_task: BackgroundTasks, db: Session =
     return {"message": "New OTP has been sent to your email"}
 
 
-@router.post("/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = sql_query.get_user_by_email(db, form_data.username)
-
-    if not user:
-        raise HTTPException(status_code=400, detail="Invalid email or password")
-    
-    if not utils.verify_password(form_data.password, user.password):
-        raise HTTPException(status_code=400, detail="Invalid email or password")
-    
-    # user_data = {
-    #     "sub": user.username,  # Subject utama
-    #     "id": user.id,
-    #     "email": user.email,
-    #     "username": user.username,
-    #     "is_verified": user.is_verified
-    # }
-    
-    # access_token = utils.create_access_token(
-    #     data=user_data, expires_delta=timedelta(minutes=utils.ACCESS_TOKEN_EXPIRE_MINUTES)
-    # )
-
-    access_token = utils.create_access_token(
-        data={"sub": user.email}, expires_delta=timedelta(minutes=utils.ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-
-    return {"access_token": access_token, "token_type": "bearer"}
-
+#Forgot Password
 @router.post("/forgot-password")
 async def forgot_password(email: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user = sql_query.get_user_by_email(db, email)
@@ -136,7 +159,7 @@ async def forgot_password(email: str, background_tasks: BackgroundTasks, db: Ses
     sql_query.delete_otp_by_user_id(db, user.id)
 
     # Simpan OTP baru
-    otp_data = schema.OTPData(code=otp_code, user_id=user.id)
+    otp_data = schema.OTPData(code=otp_code, user_id=user.id, created_at=datetime.now())
     sql_query.create_otp_for_user(db, otp=otp_data)
 
     # Kirim OTP ke email
@@ -172,6 +195,7 @@ async def reset_password(email: str, otp: str, new_password: str, db: Session = 
     return {"message": "Password successfully reset"}
 
 
+#Get Current User
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(

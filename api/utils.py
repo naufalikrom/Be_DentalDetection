@@ -12,7 +12,7 @@ from jose import JWTError, jwt
 # Secret Key untuk JWT
 SECRET_KEY = "dentalDetection"  # Ganti dengan secret key yang lebih aman
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 3
 
 settings = get_settings()
 
