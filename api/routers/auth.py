@@ -23,7 +23,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     user = sql_query.get_user_by_email(db, form_data.username)
 
     if not user:
-        raise HTTPException(status_code=400, detail="Invalid email or password")
+        raise HTTPException(status_code=400, detail="Email not found. Please sign up first.")
     
     if not utils.verify_password(form_data.password, user.password):
         raise HTTPException(status_code=400, detail="Invalid email or password")
