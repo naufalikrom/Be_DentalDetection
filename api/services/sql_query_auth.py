@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from . import models, schema
+from .. import models, schema
 
 
 def check_user_exist(db:Session, email:str):

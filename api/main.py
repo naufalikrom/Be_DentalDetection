@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from .routers import auth
+
+from .routers import auth, panoramic, detected
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -34,3 +35,5 @@ async def root():
     return {"message": "Awesome Dental Detection"}
 
 app.include_router(auth.router)
+app.include_router(panoramic.router)
+app.include_router(detected.router)

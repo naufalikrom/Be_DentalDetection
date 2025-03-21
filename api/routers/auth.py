@@ -1,7 +1,9 @@
 from fastapi import APIRouter, status, Depends, HTTPException, BackgroundTasks, Response
+
+from ..services import sql_query_auth
 from ..database import get_db
 from sqlalchemy.orm import Session
-from .. import schema, sql_query, utils, models
+from .. import schema, utils, models
 
 
 
@@ -20,7 +22,7 @@ OTP_EXPIRATION_SECONDS = 180
 #LOGIN
 @router.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = sql_query.get_user_by_email(db, form_data.username)
+    user = sql_query_auth.get_user_by_email(db, form_data.username)
 
     if not user:
         raise HTTPException(status_code=400, detail="Email not found. Please sign up first.")
@@ -48,7 +50,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 async def register_user(user: schema.UserCreate, background_task: BackgroundTasks ,db: Session = Depends(get_db)):
     
     #check if email already exists
-    result=sql_query.check_user_exist(db, email=user.email)
+    result=sql_query_auth.check_user_exist(db, email=user.email)
     if result:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"User with email: {user.email} already exists")
     
@@ -56,7 +58,7 @@ async def register_user(user: schema.UserCreate, background_task: BackgroundTask
     user.password = utils.hash_password(user.password)
     
     #create a new user
-    user = sql_query.insert_new_user(db, user=user)
+    user = sql_query_auth.insert_new_user(db, user=user)
     
     #send email confirmation
     #user email
@@ -66,7 +68,7 @@ async def register_user(user: schema.UserCreate, background_task: BackgroundTask
     utils.send_email("verify your email", [user.email], background_task, f"your otp code is {otpcode}")
 
     
-    sql_query.create_otp_for_user(db, otp=otp_data)
+    sql_query_auth.create_otp_for_user(db, otp=otp_data)
     
     return{
         "message" : "account successfully created, please verify your email with One Time Passwoord to your email address"
@@ -122,7 +124,7 @@ async def verify_email(otp: schema.OneTimePassword, response: Response, db: Sess
 @router.post('/resend_otp', status_code=status.HTTP_200_OK)
 async def resend_otp(email: str, background_task: BackgroundTasks, db: Session = Depends(get_db)):
     # Cek apakah user ada
-    user = sql_query.get_user_by_email(db, email=email)
+    user = sql_query_auth.get_user_by_email(db, email=email)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
@@ -131,12 +133,12 @@ async def resend_otp(email: str, background_task: BackgroundTasks, db: Session =
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already verified")
 
     # Hapus OTP lama yang belum diverifikasi
-    sql_query.delete_otp_by_user_id(db, user_id=user.id)
+    sql_query_auth.delete_otp_by_user_id(db, user_id=user.id)
 
     # Generate OTP baru
     new_otp = utils.generate_otp_code()
     new_otp_data = schema.OTPData(code=new_otp, user_id=user.id, created_at=datetime.now())
-    sql_query.create_otp_for_user(db, otp=new_otp_data)
+    sql_query_auth.create_otp_for_user(db, otp=new_otp_data)
 
     # Kirim ulang OTP ke email
     utils.send_email("Resend OTP Code", [user.email], background_task, f"Your new OTP code is {new_otp}")
@@ -147,7 +149,7 @@ async def resend_otp(email: str, background_task: BackgroundTasks, db: Session =
 #Forgot Password
 @router.post("/forgot-password")
 async def forgot_password(email: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    user = sql_query.get_user_by_email(db, email)
+    user = sql_query_auth.get_user_by_email(db, email)
 
     if not user:
         raise HTTPException(status_code=400, detail="Email not found")
@@ -156,11 +158,11 @@ async def forgot_password(email: str, background_tasks: BackgroundTasks, db: Ses
     otp_code = utils.generate_otp_code()
     
     # Hapus OTP lama jika ada
-    sql_query.delete_otp_by_user_id(db, user.id)
+    sql_query_auth.delete_otp_by_user_id(db, user.id)
 
     # Simpan OTP baru
     otp_data = schema.OTPData(code=otp_code, user_id=user.id, created_at=datetime.now())
-    sql_query.create_otp_for_user(db, otp=otp_data)
+    sql_query_auth.create_otp_for_user(db, otp=otp_data)
 
     # Kirim OTP ke email
     utils.send_email("Reset Password OTP", [email], background_tasks, f"Your OTP code is {otp_code}")
@@ -169,7 +171,7 @@ async def forgot_password(email: str, background_tasks: BackgroundTasks, db: Ses
 
 @router.post("/reset-password")
 async def reset_password(email: str, otp: str, new_password: str, db: Session = Depends(get_db)):
-    user = sql_query.get_user_by_email(db, email)
+    user = sql_query_auth.get_user_by_email(db, email)
 
     if not user:
         raise HTTPException(status_code=400, detail="Invalid email")
