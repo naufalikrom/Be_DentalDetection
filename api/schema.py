@@ -33,40 +33,24 @@ class OneTimePassword(BaseModel):
     code: str
 
 
-# class PanoramicImageBase(BaseModel):
-#     id_user: int
-#     no_rm: str
-#     image_url: str
-
-# class PanoramicImageCreate(PanoramicImageBase):
-#     pass
-
-# class PanoramicImageUpdate(BaseModel):
-#     no_rm: Optional[str] = None
-#     image_url: Optional[str] = None
-
-# class PanoramicImageResponse(PanoramicImageBase):
-#     id: int
-#     created_at: datetime
-
-#     class Config:
-#         from_attributes = True
-
 
 
 
 class PanoramicImageCreate(BaseModel):
     id_user: int
     no_rm: str
+    name_patient: str
 
 class PanoramicImageUpdate(BaseModel):
     no_rm: Optional[str] = None
+    name_patient: Optional[str] = None
     image_url: Optional[str] = None
 
 class PanoramicImageResponse(BaseModel):
     id: int
     id_user: int
     no_rm: str
+    name_patient: str
     image_url: str
 
     class Config:

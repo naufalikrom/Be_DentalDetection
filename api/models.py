@@ -33,6 +33,7 @@ class PanoramicImage(Base):
     id = sql.Column(sql.Integer, primary_key=True, autoincrement=True, index=True)
     id_user = sql.Column(sql.Integer, sql.ForeignKey("users.id", ondelete="CASCADE"))
     no_rm = sql.Column(sql.String, unique=True, nullable=False)
+    name_patient = sql.Column(sql.String, nullable=False)
     image_url = sql.Column(sql.String, nullable=False)  # Path file gambar
     created_at = sql.Column(sql.DateTime, default=datetime.now, nullable=False)
 

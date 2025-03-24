@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from .routers import auth, panoramic, detected
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 
 app=FastAPI(
@@ -37,3 +38,7 @@ async def root():
 app.include_router(auth.router)
 app.include_router(panoramic.router)
 app.include_router(detected.router)
+
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# app.mount("/detected_uploads", StaticFiles(directory="detected_uploads"), name="detected_uploads")
+
