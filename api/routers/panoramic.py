@@ -65,23 +65,29 @@ def create_panoramic(
 
 @router.put("/{no_rm}", response_model=schema.PanoramicImageResponse)
 def update_panoramic(
-    no_rm: str,  
+    no_rm: str,
     name_patient: str = Form(...),
-    file: UploadFile = File(...),  
+    file: UploadFile = File(None),  
     db: Session = Depends(get_db)
 ):
-    upload_folder = "uploads/"
-    os.makedirs(upload_folder, exist_ok=True)
-
-    file_path = os.path.join(upload_folder, file.filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    updated_image = sql_query_panoramic.update_panoramic_image(db, no_rm, name_patient, file_path)
-
-    if updated_image is None:
+    db_panoramic = sql_query_panoramic.get_panoramic_image_by_no_rm(db, no_rm)
+    
+    if not db_panoramic:
         raise HTTPException(status_code=404, detail="Panoramic image not found")
+    
+    image_url = db_panoramic.image_url  # Gunakan URL lama jika file tidak diunggah
 
+    if file:  
+        upload_folder = "uploads/"
+        os.makedirs(upload_folder, exist_ok=True)
+
+        file_path = os.path.join(upload_folder, file.filename)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        image_url = file_path  # Gunakan file baru jika diunggah
+    
+    updated_image = sql_query_panoramic.update_panoramic_image(db, no_rm, name_patient, image_url)
     return updated_image
 
 
