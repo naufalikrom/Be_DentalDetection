@@ -58,18 +58,22 @@ class PanoramicImageResponse(BaseModel):
 
 
 
-# Schema untuk menambah DetectedPanoramic
-class DetectedPanoramicCreate(BaseModel):
-    id_panoramic_image: int
-    detection_result: Dict[str, Any]  # Hasil deteksi dalam bentuk JSON
+class CroppedImage(BaseModel):
+    cropped_image_url: str
+    cropped_squared_image_url: str
+    detection_desease_result: Optional[str]  # Bisa bernilai None jika tidak ada hasil deteksi penyakit
 
-# Schema untuk response DetectedPanoramic
+# class DetectedPanoramicResponse(BaseModel):
+#     id: int
+#     id_panoramic_image: int
+#     detected_image_url: str
+#     result_detection_images: Dict[str, CroppedImage]  # Mengubah detection_result menjadi struktur yang lebih jelas
+
 class DetectedPanoramicResponse(BaseModel):
-    id: int
-    id_panoramic_image: int
+    id: Optional[int] = None
+    id_panoramic_image: Optional[int] = None
     detected_image_url: str
-    detected_crop_image_url: str
-    detection_result: Dict[str, Any]
+    result_detection_images: Dict[str, CroppedImage]
 
     class Config:
         from_attributes = True

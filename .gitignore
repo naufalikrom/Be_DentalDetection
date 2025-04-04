@@ -2,6 +2,8 @@
 venv/
 env/
 
+models/
+
 # Python Bytecode Files
 __pycache__/
 *.pyc

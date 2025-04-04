@@ -46,9 +46,8 @@ class DetectedPanoramic(Base):
 
     id = sql.Column(sql.Integer, primary_key=True, autoincrement=True, index=True)
     id_panoramic_image = sql.Column(sql.Integer, sql.ForeignKey("panoramic_images.id", ondelete="CASCADE"))
-    detected_image_url = sql.Column(sql.String, nullable=False)  # Path gambar hasil deteksi
-    detected_crop_image_url = sql.Column(sql.String, nullable=False)  # Path gambar hasil crop
-    detection_result = sql.Column(sql.JSON, nullable=False)  # Data JSON hasil deteksi
+    detected_image_url = sql.Column(sql.String, nullable=False) 
+    result_detection_images = sql.Column(sql.JSON, nullable=False)
     created_at = sql.Column(sql.DateTime, default=datetime.now, nullable=False)
 
     # Relasi dengan PanoramicImage

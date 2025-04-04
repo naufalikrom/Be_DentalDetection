@@ -1,49 +1,55 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ..database import get_db
-from .. import schema
 from ..services import sql_query_detected
-
+from ..schema import DetectedPanoramicResponse
+from ..models import DetectedPanoramic, PanoramicImage
 from typing import List
-
 
 router = APIRouter(prefix="/api/v1/detected", tags=["Detected Panoramic"])
 
-@router.post("/", response_model=schema.DetectedPanoramicResponse)
-def create_detected_panoramic(
-    id_panoramic_image: int = Form(...),
-    detection_result: str = Form(...),
-    detected_file: UploadFile = File(...),
-    crop_file: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
-    import json
-    detection_data = json.loads(detection_result)  # Konversi string JSON ke Python dict
-    
-    detected_panoramic = sql_query_detected.create_detected_panoramic(
-        db, id_panoramic_image, detection_data, detected_file, crop_file
-    )
-    
-    return detected_panoramic
+@router.put("/{no_rm}", response_model=DetectedPanoramicResponse)
+def detect_teeth(no_rm: str, db: Session = Depends(get_db)):
+    """Deteksi gigi dari gambar panoramic. Jika sudah ada, update data lama."""
+    try:
+        # Cek apakah data sudah ada
+        detected = db.query(DetectedPanoramic).join(PanoramicImage).filter(PanoramicImage.no_rm == no_rm).first()
 
-@router.get("/{detected_id}", response_model=schema.DetectedPanoramicResponse)
-def get_detected_panoramic(detected_id: int, db: Session = Depends(get_db)):
-    detected_panoramic = sql_query_detected.get_detected_panoramic(db, detected_id)
-    
-    if detected_panoramic is None:
-        raise HTTPException(status_code=404, detail="Detected image not found")
-    
-    return detected_panoramic
+        if detected:
+            db.delete(detected)
+            db.commit()
+        
+        # Jalankan deteksi baru
+        new_detected = sql_query_detected.detect_and_store(db, no_rm)
 
-@router.get("/by_panoramic/{panoramic_id}", response_model=List[schema.DetectedPanoramicResponse])
-def get_detected_panoramics_by_panoramic_id(panoramic_id: int, db: Session = Depends(get_db)):
-    return sql_query_detected.get_detected_panoramics_by_panoramic_id(db, panoramic_id)
+        return DetectedPanoramicResponse(
+            id=new_detected.id,
+            id_panoramic_image=new_detected.id_panoramic_image,
+            detected_image_url=new_detected.detected_image_url,
+            result_detection_images=new_detected.result_detection_images
+        )
 
-@router.delete("/{detected_id}")
-def delete_detected_panoramic(detected_id: int, db: Session = Depends(get_db)):
-    deleted_panoramic = sql_query_detected.delete_detected_panoramic(db, detected_id)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@router.get("/{no_rm}", response_model=List[DetectedPanoramicResponse])
+def get_detected_images(no_rm: str, db: Session = Depends(get_db)):
+    detected = db.query(DetectedPanoramic).join(PanoramicImage).filter(PanoramicImage.no_rm == no_rm).all()
     
-    if deleted_panoramic is None:
-        raise HTTPException(status_code=404, detail="Detected image not found")
-    
-    return {"message": "Detected image deleted successfully"}
+    if not detected:
+        raise HTTPException(status_code=404, detail="Detected images not found")
+
+    return [
+        DetectedPanoramicResponse(
+            id=d.id,
+            id_panoramic_image=d.id_panoramic_image,
+            detected_image_url=d.detected_image_url,
+            result_detection_images=d.result_detection_images
+        ) for d in detected
+    ]
+
+
